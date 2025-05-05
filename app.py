@@ -65,7 +65,7 @@ def calculate(isolar_path, r_path, lower=300, upper=2400, separator="\t"):
     return float(R_solar_discrete)
 
 
-st.title("Solar R Calculator")
+st.title("Solar Reflectivity Calculator")
 
 # 上传文件
 isolar_file = st.file_uploader("Upload isolar file", type=["txt", "csv"])
