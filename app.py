@@ -1,5 +1,6 @@
 import streamlit as st
 
+
 def calculate(isolar_path, r_path, lower=300, upper=2400, separator="\t"):
     import pandas as pd
 
@@ -47,6 +48,13 @@ def calculate(isolar_path, r_path, lower=300, upper=2400, separator="\t"):
         r_range[["wavelength_um", "R"]],
         on="wavelength_um",
     )
+
+    # ------------------- Handle the missing value -------------------
+    merged = merged.dropna()
+    merged["I_solar"] = merged["I_solar"].astype(float)
+    merged["R"] = merged["R"].astype(float)
+    merged["wavelength_um"] = merged["wavelength_um"].astype(float)
+    # --------------------Handle the missing value end-------------------
 
     # Convert R from percent to 0-1
     merged["R"] /= 100
