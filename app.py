@@ -68,7 +68,7 @@ def calculate(isolar_path, r_path, lower=300, upper=2400, separator="\t"):
     R_solar_discrete = numerator / denominator
 
     # 保留4位小数
-    R_solar_discrete = round(R_solar_discrete, 4)
+    R_solar_discrete = round(R_solar_discrete, 6)
 
     return float(R_solar_discrete)
 
