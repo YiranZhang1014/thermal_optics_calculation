@@ -2,6 +2,7 @@ import streamlit as st
 
 
 def calculate(isolar_path, r_path, lower=300, upper=2400, separator="\t"):
+    import numpy as np
     import pandas as pd
 
     # 读取数据
@@ -63,12 +64,13 @@ def calculate(isolar_path, r_path, lower=300, upper=2400, separator="\t"):
     delta_lambda = 0.001
 
     # Compute weighted reflectance
-    numerator = (merged["I_solar"] * merged["R"]).sum() * delta_lambda
-    denominator = merged["I_solar"].sum() * delta_lambda
-    R_solar_discrete = numerator / denominator
+    numerator_trapz = np.trapezoid(
+        merged["I_solar"] * merged["R"], merged["wavelength_um"]
+    )
+    denominator_trapz = np.trapezoid(merged["I_solar"], merged["wavelength_um"])
 
-    # 保留4位小数
-    R_solar_discrete = round(R_solar_discrete, 6)
+    R_solar_trapz = numerator_trapz / denominator_trapz
+    R_solar_trapz = round(R_solar_trapz, 6)
 
     return float(R_solar_discrete)
 
