@@ -72,7 +72,7 @@ def calculate(isolar_path, r_path, lower=300, upper=2400, separator="\t"):
     R_solar_trapz = numerator_trapz / denominator_trapz
     R_solar_trapz = round(R_solar_trapz, 6)
 
-    return float(R_solar_discrete)
+    return float(R_solar_trapz)
 
 
 st.title("Solar Reflectivity Calculator")
@@ -112,3 +112,4 @@ if isolar_file and r_file:
 
 else:
     st.info("Please upload both files and set the parameters.")
+
