@@ -2,76 +2,56 @@ import streamlit as st
 
 
 def calculate(isolar_path, r_path, lower=300, upper=2400, separator="\t"):
-    import numpy as np
     import pandas as pd
+    import numpy as np
 
-    # 读取数据
+    # Read the data files
     isolar = pd.read_csv(
         isolar_path, sep=separator, header=None, names=["wavelength_nm", "I_solar"]
     )
     r = pd.read_csv(r_path, sep=separator, header=None, names=["wavelength_nm", "R"])
 
-    # 过滤掉小数点后有数字的行
-    isolar_int = isolar[isolar["wavelength_nm"] % 1 == 0]
-    r_int = r[r["wavelength_nm"] % 1 == 0]
+    # Ensure data is numeric and drop any rows with text/missing values (e.g., headers)
+    isolar["wavelength_nm"] = pd.to_numeric(isolar["wavelength_nm"], errors='coerce')
+    isolar["I_solar"] = pd.to_numeric(isolar["I_solar"], errors='coerce')
+    r["wavelength_nm"] = pd.to_numeric(r["wavelength_nm"], errors='coerce')
+    r["R"] = pd.to_numeric(r["R"], errors='coerce')
 
-    isolar_filtered_int = isolar_int[
-        (isolar_int["wavelength_nm"] >= lower) & (isolar_int["wavelength_nm"] <= upper)
-    ]
-    r_filtered_int = r_int[
-        (r_int["wavelength_nm"] >= lower) & (r_int["wavelength_nm"] <= upper)
-    ]
+    isolar = isolar.dropna().sort_values("wavelength_nm")
+    r = r.dropna().sort_values("wavelength_nm")
 
-    # 明确创建副本
-    isolar_filtered_int = isolar_int[
-        (isolar_int["wavelength_nm"] >= lower) & (isolar_int["wavelength_nm"] <= upper)
+    # Determine the valid overlapping range between the two datasets and the user bounds
+    overlap_min = max(isolar["wavelength_nm"].min(), r["wavelength_nm"].min(), lower)
+    overlap_max = min(isolar["wavelength_nm"].max(), r["wavelength_nm"].max(), upper)
+
+    # Filter the solar spectrum to this common range
+    isolar_valid = isolar[
+        (isolar["wavelength_nm"] >= overlap_min) & (isolar["wavelength_nm"] <= overlap_max)
     ].copy()
-    r_filtered_int = r_int[
-        (r_int["wavelength_nm"] >= lower) & (r_int["wavelength_nm"] <= upper)
-    ].copy()
 
-    isolar_filtered_int["wavelength_um"] = isolar_filtered_int["wavelength_nm"] / 1000
-    r_filtered_int["wavelength_um"] = r_filtered_int["wavelength_nm"] / 1000
+    # Convert wavelengths from nm to um to standardise units
+    isolar_valid["wavelength_um"] = isolar_valid["wavelength_nm"] / 1000
+    wl_common_um = isolar_valid["wavelength_um"].values
+    I_solar_common = isolar_valid["I_solar"].values
 
-    # Restrict to common range
-    isolar_range = isolar_filtered_int[
-        (isolar_filtered_int["wavelength_um"] >= 0.5)
-        & (isolar_filtered_int["wavelength_um"] <= 2.4)
-    ]
-    r_range = r_filtered_int[
-        (r_filtered_int["wavelength_um"] >= 0.5)
-        & (r_filtered_int["wavelength_um"] <= 2.4)
-    ]
+    r_wl_um = r["wavelength_nm"].values / 1000
+    r_val = r["R"].values / 100.0  # Convert reflectance from percentage to a fraction (0 to 1)
 
-    # Merge on common wavelength values
-    merged = pd.merge(
-        isolar_range[["wavelength_um", "I_solar"]],
-        r_range[["wavelength_um", "R"]],
-        on="wavelength_um",
-    )
+    # Interpolate the reflectance data onto the solar spectrum's wavelength grid
+    # This is the scientific approach to harmonise mismatched data points
+    R_interp = np.interp(wl_common_um, r_wl_um, r_val)
 
-    # ------------------- Handle the missing value -------------------
-    merged = merged.dropna()
-    merged["I_solar"] = merged["I_solar"].astype(float)
-    merged["R"] = merged["R"].astype(float)
-    merged["wavelength_um"] = merged["wavelength_um"].astype(float)
-    # --------------------Handle the missing value end-------------------
+    # Clip the interpolated reflectance to physical limits to prevent anomalies
+    R_interp = np.clip(R_interp, 0.0, 1.0)
 
-    # Convert R from percent to 0-1
-    merged["R"] /= 100
-
-    # Assume uniform delta_lambda = 0.001 μm
-    delta_lambda = 0.001
-
-    # Compute weighted reflectance
-    numerator_trapz = np.trapezoid(
-        merged["I_solar"] * merged["R"], merged["wavelength_um"]
-    )
-    denominator_trapz = np.trapezoid(merged["I_solar"], merged["wavelength_um"])
+    # Calculate the weighted reflectance using trapezoidal integration
+    numerator_trapz = np.trapezoid(I_solar_common * R_interp, x=wl_common_um)
+    denominator_trapz = np.trapezoid(I_solar_common, x=wl_common_um)
 
     R_solar_trapz = numerator_trapz / denominator_trapz
     R_solar_trapz = round(R_solar_trapz, 6)
 
+    # The final calculated value
     return float(R_solar_trapz)
 
 
@@ -82,8 +62,8 @@ isolar_file = st.file_uploader("Upload isolar file", type=["txt", "csv"])
 r_file = st.file_uploader("Upload r file", type=["txt", "csv"])
 
 # 参数输入
-lower = st.number_input("Lower limit", value=300)
-upper = st.number_input("Upper limit", value=2400)
+lower = st.number_input("Lower limit (> 300)", value=300)
+upper = st.number_input("Upper limit (< 2500)", value=2500)
 separator = st.text_input("Separator", value="\\t")  # 默认tab
 
 # 只在文件和参数齐全时启用按钮
@@ -112,4 +92,3 @@ if isolar_file and r_file:
 
 else:
     st.info("Please upload both files and set the parameters.")
-
